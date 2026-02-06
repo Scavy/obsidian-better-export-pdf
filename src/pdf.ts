@@ -369,19 +369,28 @@ export function setMetadata(
  * Read template file content from vault
  * @param app - Obsidian App instance
  * @param filePath - Path to template file relative to vault
+ * @param debugMode - Whether to show detailed logging
  * @returns Template content or null if file not found
  */
-async function readTemplateFile(app: App, filePath: string): Promise<string | null> {
+async function readTemplateFile(app: App, filePath: string, debugMode = false): Promise<string | null> {
   try {
     const file = app.vault.getAbstractFileByPath(filePath);
     if (file && file instanceof TFile) {
       // File exists, read its contents
       const content = await app.vault.read(file);
+      if (debugMode) {
+        console.log(`✓ Template file loaded successfully: ${filePath}`);
+      }
       return content;
     }
+    // File not found - always log warning to help with debugging
+    console.warn(
+      `⚠ Template file not found: ${filePath}\n` +
+      `  Make sure the file exists in your vault and the path is relative to the vault root.`
+    );
     return null;
   } catch (error) {
-    console.warn(`Failed to read template file: ${filePath}`, error);
+    console.error(`✗ Failed to read template file: ${filePath}`, error);
     return null;
   }
 }
@@ -407,26 +416,52 @@ export async function exportToPDF(
     scale = 100;
   }
 
-  // Read header template from file if specified in frontmatter
+  // Read header template with priority: file > inline > config default
   let headerTemplate = config["headerTemplate"];
+  let headerTemplateSource = "config default";
+  
+  // Priority 2: inline template from frontmatter
+  if (frontMatter?.["headerTemplate"]) {
+    headerTemplate = frontMatter["headerTemplate"];
+    headerTemplateSource = "inline frontmatter";
+  }
+  // Priority 1: file template from frontmatter (highest priority, overrides inline)
   if (frontMatter?.["headerTemplateFile"]) {
-    const fileContent = await readTemplateFile(app, frontMatter["headerTemplateFile"]);
+    if (config.debug) {
+      console.log(`Reading header template from file: ${frontMatter["headerTemplateFile"]}`);
+    }
+    const fileContent = await readTemplateFile(app, frontMatter["headerTemplateFile"], config.debug);
     if (fileContent !== null) {
       headerTemplate = fileContent;
+      headerTemplateSource = `file: ${frontMatter["headerTemplateFile"]}`;
     }
-  } else if (frontMatter?.["headerTemplate"]) {
-    headerTemplate = frontMatter["headerTemplate"];
+  }
+  if (config.debug) {
+    console.log(`Using header template from: ${headerTemplateSource}`);
   }
 
-  // Read footer template from file if specified in frontmatter
+  // Read footer template with priority: file > inline > config default
   let footerTemplate = config["footerTemplate"];
+  let footerTemplateSource = "config default";
+  
+  // Priority 2: inline template from frontmatter
+  if (frontMatter?.["footerTemplate"]) {
+    footerTemplate = frontMatter["footerTemplate"];
+    footerTemplateSource = "inline frontmatter";
+  }
+  // Priority 1: file template from frontmatter (highest priority, overrides inline)
   if (frontMatter?.["footerTemplateFile"]) {
-    const fileContent = await readTemplateFile(app, frontMatter["footerTemplateFile"]);
+    if (config.debug) {
+      console.log(`Reading footer template from file: ${frontMatter["footerTemplateFile"]}`);
+    }
+    const fileContent = await readTemplateFile(app, frontMatter["footerTemplateFile"], config.debug);
     if (fileContent !== null) {
       footerTemplate = fileContent;
+      footerTemplateSource = `file: ${frontMatter["footerTemplateFile"]}`;
     }
-  } else if (frontMatter?.["footerTemplate"]) {
-    footerTemplate = frontMatter["footerTemplate"];
+  }
+  if (config.debug) {
+    console.log(`Using footer template from: ${footerTemplateSource}`);
   }
 
   const printOptions: electron.PrintToPDFOptions = {
