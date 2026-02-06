@@ -22,14 +22,32 @@ footerTemplateFile: templates/my-footer.html
 ---
 ```
 
+### Using Obsidian Wiki-Link Syntax
+
+You can also use Obsidian's native wiki-link syntax:
+
+```yaml
+---
+title: My Document
+headerTemplateFile: [[templates/my-header.html]]
+footerTemplateFile: [[templates/my-footer]]
+---
+```
+
+Note: When using wiki-links without an extension, the plugin will automatically try adding `.html`.
+
 ### File Path Format
 
 - File paths should be **relative to the vault root**
+- Supports both **plain paths** and **Obsidian wiki-link syntax** (`[[path]]`)
 - Use forward slashes (`/`) for path separators
+- The `.html` extension is optional when using wiki-link syntax
 - Examples:
-  - `templates/header.html`
-  - `assets/pdf-templates/custom-footer.html`
-  - `header.html` (file in vault root)
+  - Plain path: `templates/header.html`
+  - Wiki-link: `[[templates/header.html]]`
+  - Wiki-link without extension: `[[templates/header]]` (will automatically try `.html`)
+  - File in vault root: `header.html` or `[[header.html]]`
+  - With alias (alias ignored): `[[templates/header.html|My Header]]`
 
 ## Priority Order
 

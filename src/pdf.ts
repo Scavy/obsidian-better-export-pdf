@@ -366,26 +366,94 @@ export function setMetadata(
 }
 
 /**
+ * Parse Obsidian wiki-link syntax to extract the actual file path
+ * Handles formats like [[path]], [[path|alias]], and plain paths
+ * Note: Pipe characters within wiki-links are treated as alias separators
+ * @param linkText - The link text which may contain [[ ]] wrappers
+ * @returns The cleaned file path
+ */
+function parseObsidianLink(linkText: string): string {
+  if (!linkText) {
+    return linkText;
+  }
+  
+  // Remove [[ ]] wrappers if present
+  let cleanPath = linkText.trim();
+  const isWikiLink = cleanPath.startsWith("[[") && cleanPath.endsWith("]]");
+  if (isWikiLink) {
+    cleanPath = cleanPath.slice(2, -2);
+  }
+  
+  // Handle [[path|alias]] format - only process pipe if this was a wiki-link
+  if (isWikiLink) {
+    const pipeIndex = cleanPath.indexOf("|");
+    if (pipeIndex !== -1) {
+      cleanPath = cleanPath.slice(0, pipeIndex);
+    }
+  }
+  
+  return cleanPath.trim();
+}
+
+/**
+ * Check if a path has a file extension
+ * More robust than checking for dots, as it only checks the final path segment
+ * Note: Obsidian vault paths always use forward slashes (/) regardless of OS
+ * @param path - The file path to check
+ * @returns True if the path has an extension
+ */
+function hasFileExtension(path: string): boolean {
+  const lastSlash = path.lastIndexOf("/");
+  const fileName = lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
+  const lastDot = fileName.lastIndexOf(".");
+  // Check if there's a dot and it's not at the start of the filename (hidden files)
+  return lastDot > 0;
+}
+
+/**
  * Read template file content from vault
+ * Supports both plain paths and Obsidian wiki-link syntax ([[path]])
+ * Note: If a file has a specific extension (e.g., .htm), you must include it in the path.
+ * The automatic .html extension is only added when no extension is present.
  * @param app - Obsidian App instance
- * @param filePath - Path to template file relative to vault
+ * @param filePath - Path to template file (supports [[path]] syntax)
  * @param debugMode - Whether to show detailed logging
  * @returns Template content or null if file not found
  */
 async function readTemplateFile(app: App, filePath: string, debugMode = false): Promise<string | null> {
   try {
-    const file = app.vault.getAbstractFileByPath(filePath);
+    // Parse wiki-link syntax if present
+    const cleanPath = parseObsidianLink(filePath);
+    
+    if (debugMode) {
+      console.log(`Attempting to read template file: "${filePath}" -> "${cleanPath}"`);
+    }
+    
+    // Try with the cleaned path first
+    let file = app.vault.getAbstractFileByPath(cleanPath);
+    
+    // If not found and no extension, try adding .html extension
+    if (!file && !hasFileExtension(cleanPath)) {
+      const pathWithExtension = cleanPath + ".html";
+      if (debugMode) {
+        console.log(`No extension found, trying with .html: "${pathWithExtension}"`);
+      }
+      file = app.vault.getAbstractFileByPath(pathWithExtension);
+    }
+    
     if (file && file instanceof TFile) {
       // File exists, read its contents
       const content = await app.vault.read(file);
       if (debugMode) {
-        console.log(`✓ Template file loaded successfully: ${filePath}`);
+        console.log(`✓ Template file loaded successfully: ${file.path}`);
       }
       return content;
     }
+    
     // File not found - always log warning to help with debugging
     console.warn(
       `⚠ Template file not found: ${filePath}\n` +
+      `  Cleaned path: ${cleanPath}\n` +
       `  Make sure the file exists in your vault and the path is relative to the vault root.`
     );
     return null;
