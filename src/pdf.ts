@@ -390,7 +390,7 @@ export async function exportToPDF(
   outputFile: string,
   config: TConfig & BetterExportPdfPluginSettings,
   w: WebviewTag,
-  { doc, frontMatter, file }: DocType,
+  { doc, frontMatter }: DocType,
   app: App,
 ) {
   console.log("output pdf:", outputFile);
