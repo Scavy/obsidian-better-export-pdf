@@ -465,6 +465,7 @@ async function readTemplateFile(app: App, filePath: string, debugMode = false, s
       file = tryResolveFile(pathWithExtension);
     }
     
+    // Type check is handled internally by tryResolveFile(), which only returns TFile instances
     if (file) {
       // File exists, read its contents
       const content = await app.vault.read(file);
