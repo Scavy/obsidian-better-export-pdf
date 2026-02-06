@@ -398,6 +398,7 @@ function parseObsidianLink(linkText: string): string {
 /**
  * Check if a path has a file extension
  * More robust than checking for dots, as it only checks the final path segment
+ * Note: Obsidian vault paths always use forward slashes (/) regardless of OS
  * @param path - The file path to check
  * @returns True if the path has an extension
  */
@@ -412,6 +413,8 @@ function hasFileExtension(path: string): boolean {
 /**
  * Read template file content from vault
  * Supports both plain paths and Obsidian wiki-link syntax ([[path]])
+ * Note: If a file has a specific extension (e.g., .htm), you must include it in the path.
+ * The automatic .html extension is only added when no extension is present.
  * @param app - Obsidian App instance
  * @param filePath - Path to template file (supports [[path]] syntax)
  * @param debugMode - Whether to show detailed logging
