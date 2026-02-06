@@ -373,6 +373,7 @@ export class ExportConfigModal extends Modal {
                 { ...this.plugin.settings, ...this.config },
                 wb,
                 this.docs[i],
+                this.app,
               );
             }),
           );
@@ -381,7 +382,7 @@ export class ExportConfigModal extends Modal {
       } else {
         const outputFile = await getOutputFile(title, this.plugin.settings.isTimestamp);
         if (outputFile) {
-          await exportToPDF(outputFile, { ...this.plugin.settings, ...this.config }, this.webviews[0], this.docs[0]);
+          await exportToPDF(outputFile, { ...this.plugin.settings, ...this.config }, this.webviews[0], this.docs[0], this.app);
           this.close();
         }
       }
