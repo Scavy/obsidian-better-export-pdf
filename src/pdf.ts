@@ -366,26 +366,73 @@ export function setMetadata(
 }
 
 /**
+ * Parse Obsidian wiki-link syntax to extract the actual file path
+ * Handles formats like [[path]], [[path|alias]], and plain paths
+ * @param linkText - The link text which may contain [[ ]] wrappers
+ * @returns The cleaned file path
+ */
+function parseObsidianLink(linkText: string): string {
+  if (!linkText) {
+    return linkText;
+  }
+  
+  // Remove [[ ]] wrappers if present
+  let cleanPath = linkText.trim();
+  if (cleanPath.startsWith("[[") && cleanPath.endsWith("]]")) {
+    cleanPath = cleanPath.slice(2, -2);
+  }
+  
+  // Handle [[path|alias]] format - take only the path part
+  const pipeIndex = cleanPath.indexOf("|");
+  if (pipeIndex !== -1) {
+    cleanPath = cleanPath.slice(0, pipeIndex);
+  }
+  
+  return cleanPath.trim();
+}
+
+/**
  * Read template file content from vault
+ * Supports both plain paths and Obsidian wiki-link syntax ([[path]])
  * @param app - Obsidian App instance
- * @param filePath - Path to template file relative to vault
+ * @param filePath - Path to template file (supports [[path]] syntax)
  * @param debugMode - Whether to show detailed logging
  * @returns Template content or null if file not found
  */
 async function readTemplateFile(app: App, filePath: string, debugMode = false): Promise<string | null> {
   try {
-    const file = app.vault.getAbstractFileByPath(filePath);
+    // Parse wiki-link syntax if present
+    const cleanPath = parseObsidianLink(filePath);
+    
+    if (debugMode) {
+      console.log(`Attempting to read template file: "${filePath}" -> "${cleanPath}"`);
+    }
+    
+    // Try with the cleaned path first
+    let file = app.vault.getAbstractFileByPath(cleanPath);
+    
+    // If not found and no extension, try adding .html extension
+    if (!file && !cleanPath.includes(".")) {
+      const pathWithExtension = cleanPath + ".html";
+      if (debugMode) {
+        console.log(`No extension found, trying with .html: "${pathWithExtension}"`);
+      }
+      file = app.vault.getAbstractFileByPath(pathWithExtension);
+    }
+    
     if (file && file instanceof TFile) {
       // File exists, read its contents
       const content = await app.vault.read(file);
       if (debugMode) {
-        console.log(`✓ Template file loaded successfully: ${filePath}`);
+        console.log(`✓ Template file loaded successfully: ${file.path}`);
       }
       return content;
     }
+    
     // File not found - always log warning to help with debugging
     console.warn(
       `⚠ Template file not found: ${filePath}\n` +
+      `  Cleaned path: ${cleanPath}\n` +
       `  Make sure the file exists in your vault and the path is relative to the vault root.`
     );
     return null;
