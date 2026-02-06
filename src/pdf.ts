@@ -418,30 +418,54 @@ function hasFileExtension(path: string): boolean {
  * @param app - Obsidian App instance
  * @param filePath - Path to template file (supports [[path]] syntax)
  * @param debugMode - Whether to show detailed logging
+ * @param sourceFilePath - Optional path to the source file being exported (for relative path resolution)
  * @returns Template content or null if file not found
  */
-async function readTemplateFile(app: App, filePath: string, debugMode = false): Promise<string | null> {
+async function readTemplateFile(app: App, filePath: string, debugMode = false, sourceFilePath?: string): Promise<string | null> {
   try {
     // Parse wiki-link syntax if present
     const cleanPath = parseObsidianLink(filePath);
     
     if (debugMode) {
       console.log(`Attempting to read template file: "${filePath}" -> "${cleanPath}"`);
+      if (sourceFilePath) {
+        console.log(`  Source file: "${sourceFilePath}"`);
+      }
     }
     
+    // Helper function to try finding a file using Obsidian's link resolution
+    const tryResolveFile = (pathToTry: string): TFile | null => {
+      // If we have a source file path, use Obsidian's native link resolution
+      // This handles both relative paths (just filename) and full paths from vault root
+      if (sourceFilePath) {
+        const resolved = app.metadataCache.getFirstLinkpathDest(pathToTry, sourceFilePath);
+        if (resolved instanceof TFile) {
+          return resolved;
+        }
+      }
+      
+      // Fallback to direct vault path lookup (for vault root relative paths)
+      const file = app.vault.getAbstractFileByPath(pathToTry);
+      if (file instanceof TFile) {
+        return file;
+      }
+      
+      return null;
+    };
+    
     // Try with the cleaned path first
-    let file = app.vault.getAbstractFileByPath(cleanPath);
+    let file = tryResolveFile(cleanPath);
     
     // If not found and no extension, try adding .html extension
     if (!file && !hasFileExtension(cleanPath)) {
       const pathWithExtension = cleanPath + ".html";
       if (debugMode) {
-        console.log(`No extension found, trying with .html: "${pathWithExtension}"`);
+        console.log(`  No extension found, trying with .html: "${pathWithExtension}"`);
       }
-      file = app.vault.getAbstractFileByPath(pathWithExtension);
+      file = tryResolveFile(pathWithExtension);
     }
     
-    if (file && file instanceof TFile) {
+    if (file) {
       // File exists, read its contents
       const content = await app.vault.read(file);
       if (debugMode) {
@@ -454,7 +478,8 @@ async function readTemplateFile(app: App, filePath: string, debugMode = false): 
     console.warn(
       `⚠ Template file not found: ${filePath}\n` +
       `  Cleaned path: ${cleanPath}\n` +
-      `  Make sure the file exists in your vault and the path is relative to the vault root.`
+      (sourceFilePath ? `  Source file: ${sourceFilePath}\n` : "") +
+      `  Make sure the file exists in your vault.`
     );
     return null;
   } catch (error) {
@@ -467,7 +492,7 @@ export async function exportToPDF(
   outputFile: string,
   config: TConfig & BetterExportPdfPluginSettings,
   w: WebviewTag,
-  { doc, frontMatter }: DocType,
+  { doc, frontMatter, file }: DocType,
   app: App,
 ) {
   console.log("output pdf:", outputFile);
@@ -498,7 +523,7 @@ export async function exportToPDF(
     if (config.debug) {
       console.log(`Reading header template from file: ${frontMatter["headerTemplateFile"]}`);
     }
-    const fileContent = await readTemplateFile(app, frontMatter["headerTemplateFile"], config.debug);
+    const fileContent = await readTemplateFile(app, frontMatter["headerTemplateFile"], config.debug, file.path);
     if (fileContent !== null) {
       headerTemplate = fileContent;
       headerTemplateSource = `file: ${frontMatter["headerTemplateFile"]}`;
@@ -522,7 +547,7 @@ export async function exportToPDF(
     if (config.debug) {
       console.log(`Reading footer template from file: ${frontMatter["footerTemplateFile"]}`);
     }
-    const fileContent = await readTemplateFile(app, frontMatter["footerTemplateFile"], config.debug);
+    const fileContent = await readTemplateFile(app, frontMatter["footerTemplateFile"], config.debug, file.path);
     if (fileContent !== null) {
       footerTemplate = fileContent;
       footerTemplateSource = `file: ${frontMatter["footerTemplateFile"]}`;
