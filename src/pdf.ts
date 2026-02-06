@@ -1,6 +1,6 @@
 import electron, { type WebviewTag } from "electron";
 import * as fs from "fs/promises";
-import { type FrontMatterCache } from "obsidian";
+import { type App, type FrontMatterCache, TFile } from "obsidian";
 import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFRef, StandardFonts } from "pdf-lib";
 
 import type { BetterExportPdfPluginSettings } from "./main";
@@ -365,11 +365,33 @@ export function setMetadata(
   pdfDoc.setModificationDate(new Date(updated_at ?? new Date()));
 }
 
+/**
+ * Read template file content from vault
+ * @param app - Obsidian App instance
+ * @param filePath - Path to template file relative to vault
+ * @returns Template content or null if file not found
+ */
+async function readTemplateFile(app: App, filePath: string): Promise<string | null> {
+  try {
+    const file = app.vault.getAbstractFileByPath(filePath);
+    if (file && file instanceof TFile) {
+      // File exists, read its contents
+      const content = await app.vault.read(file);
+      return content;
+    }
+    return null;
+  } catch (error) {
+    console.warn(`Failed to read template file: ${filePath}`, error);
+    return null;
+  }
+}
+
 export async function exportToPDF(
   outputFile: string,
   config: TConfig & BetterExportPdfPluginSettings,
   w: WebviewTag,
   { doc, frontMatter }: DocType,
+  app: App,
 ) {
   console.log("output pdf:", outputFile);
   let pageSize = config["pageSize"] as PageSizeType;
@@ -384,6 +406,29 @@ export async function exportToPDF(
   if (scale > 200 || scale < 10) {
     scale = 100;
   }
+
+  // Read header template from file if specified in frontmatter
+  let headerTemplate = config["headerTemplate"];
+  if (frontMatter?.["headerTemplateFile"]) {
+    const fileContent = await readTemplateFile(app, frontMatter["headerTemplateFile"]);
+    if (fileContent !== null) {
+      headerTemplate = fileContent;
+    }
+  } else if (frontMatter?.["headerTemplate"]) {
+    headerTemplate = frontMatter["headerTemplate"];
+  }
+
+  // Read footer template from file if specified in frontmatter
+  let footerTemplate = config["footerTemplate"];
+  if (frontMatter?.["footerTemplateFile"]) {
+    const fileContent = await readTemplateFile(app, frontMatter["footerTemplateFile"]);
+    if (fileContent !== null) {
+      footerTemplate = fileContent;
+    }
+  } else if (frontMatter?.["footerTemplate"]) {
+    footerTemplate = frontMatter["footerTemplate"];
+  }
+
   const printOptions: electron.PrintToPDFOptions = {
     landscape: config?.["landscape"],
     printBackground: config?.["printBackground"],
@@ -395,10 +440,10 @@ export async function exportToPDF(
     },
     displayHeaderFooter: config["displayHeader"] || config["displayFooter"],
     headerTemplate: config["displayHeader"]
-      ? render(frontMatter?.["headerTemplate"] ?? config["headerTemplate"], frontMatter ?? {})
+      ? render(headerTemplate, frontMatter ?? {})
       : "<span></span>",
     footerTemplate: config["displayFooter"]
-      ? render(frontMatter?.["footerTemplate"] ?? config["footerTemplate"], frontMatter ?? {})
+      ? render(footerTemplate, frontMatter ?? {})
       : "<span></span>",
   };
 
