@@ -60,6 +60,8 @@ jobs:
 
       - name: Generate Changelog
         id: generate_changelog
+        # Generate changelog from git history. If this fails (e.g., missing dependencies),
+        # the release will still proceed without a changelog body.
         run: npx changelogithub --no-group
         continue-on-error: true
         env:
