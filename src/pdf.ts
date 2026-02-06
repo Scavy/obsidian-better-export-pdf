@@ -407,26 +407,32 @@ export async function exportToPDF(
     scale = 100;
   }
 
-  // Read header template from file if specified in frontmatter
+  // Read header template with priority: file > inline > config default
   let headerTemplate = config["headerTemplate"];
+  // Priority 2: inline template from frontmatter
+  if (frontMatter?.["headerTemplate"]) {
+    headerTemplate = frontMatter["headerTemplate"];
+  }
+  // Priority 1: file template from frontmatter (highest priority, overrides inline)
   if (frontMatter?.["headerTemplateFile"]) {
     const fileContent = await readTemplateFile(app, frontMatter["headerTemplateFile"]);
     if (fileContent !== null) {
       headerTemplate = fileContent;
     }
-  } else if (frontMatter?.["headerTemplate"]) {
-    headerTemplate = frontMatter["headerTemplate"];
   }
 
-  // Read footer template from file if specified in frontmatter
+  // Read footer template with priority: file > inline > config default
   let footerTemplate = config["footerTemplate"];
+  // Priority 2: inline template from frontmatter
+  if (frontMatter?.["footerTemplate"]) {
+    footerTemplate = frontMatter["footerTemplate"];
+  }
+  // Priority 1: file template from frontmatter (highest priority, overrides inline)
   if (frontMatter?.["footerTemplateFile"]) {
     const fileContent = await readTemplateFile(app, frontMatter["footerTemplateFile"]);
     if (fileContent !== null) {
       footerTemplate = fileContent;
     }
-  } else if (frontMatter?.["footerTemplate"]) {
-    footerTemplate = frontMatter["footerTemplate"];
   }
 
   const printOptions: electron.PrintToPDFOptions = {
